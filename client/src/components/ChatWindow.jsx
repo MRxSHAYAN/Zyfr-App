@@ -49,37 +49,31 @@ const ChatWindow = ({ friend, onStartCall, onJoinCall, onViewProfile }) => {
   }, [messages]);
 
   // Subscribe to Pusher channel for active conversation
+  // Uses friend.conversationId directly (populated by getFriendList) — no extra API call needed.
   useEffect(() => {
-    if (!pusherClient || !friend?._id || isLocked) return;
+    if (!pusherClient || !friend?._id || !friend?.conversationId || isLocked) return;
 
-    let channelName = '';
-    // Infer conversation channel from message data or fetch
-    api.get(`/messages/${friend._id}`).then((res) => {
-      if (res.data && res.data.length > 0 && res.data[0].conversationId) {
-        channelName = `chat-${res.data[0].conversationId}`;
-        const channel = pusherClient.subscribe(channelName);
+    const channelName = `chat-${friend.conversationId}`;
+    const channel = pusherClient.subscribe(channelName);
 
-        channel.bind('message:new', (newMsg) => {
-          setMessages((prev) => {
-            if (prev.some((m) => m._id === newMsg._id)) return prev;
-            return [...prev, newMsg];
-          });
-        });
+    channel.bind('message:new', (newMsg) => {
+      setMessages((prev) => {
+        if (prev.some((m) => m._id === newMsg._id)) return prev;
+        return [...prev, newMsg];
+      });
+    });
 
-        channel.bind('typing', (data) => {
-          if (data.userId === friend._id) {
-            setFriendTyping(data.isTyping);
-          }
-        });
+    channel.bind('typing', (data) => {
+      if (data.userId === friend._id) {
+        setFriendTyping(data.isTyping);
       }
     });
 
     return () => {
-      if (channelName && pusherClient) {
-        pusherClient.unsubscribe(channelName);
-      }
+      channel.unbind_all();
+      pusherClient.unsubscribe(channelName);
     };
-  }, [pusherClient, friend?._id, isLocked]);
+  }, [pusherClient, friend?._id, friend?.conversationId, isLocked]);
 
   const handleSendMessage = async (e) => {
     e.preventDefault();
