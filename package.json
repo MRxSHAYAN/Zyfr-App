@@ -2,7 +2,7 @@
   "name": "whatsapp-clone-root",
   "version": "1.0.0",
   "description": "Root configuration for full-stack WhatsApp Web clone with dynamic environment switching and concurrent execution",
-  "main": "server/server.js",
+  "main": "server/index.js",
   "type": "module",
   "scripts": {
     "dev": "concurrently \"npm run dev --prefix server\" \"npm run dev --prefix client\"",

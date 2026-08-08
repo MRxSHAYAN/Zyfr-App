@@ -10,7 +10,7 @@
 - **Backend**: Node.js / Express, Mongoose (MongoDB ODM), Pusher Server SDK (`pusher`), JWT Authentication, Cookie-Parser, CORS.
 - **Real-Time Messaging**: Pusher Channels.
 - **Video Calling**: Daily.co REST API & Embedded Video Frame.
-- **Deployment**: Vercel Serverless Functions (`server/api/index.js` + `vercel.json`).
+- **Deployment**: Vercel Services Monorepo (`client/` + `server/index.js` + `vercel.json`).
 
 ---
 
@@ -55,9 +55,7 @@
 
 ```
 ZYFR Web Application/
-├── api/
-│   └── index.js              # Vercel Serverless Function entry point
-├── client/                   # Frontend Vite React SPA
+├── client/                   # Frontend Vite React SPA service
 │   ├── src/
 │   │   ├── components/       # ChatWindow, Sidebar, UserSearch, DailyVideoCall, UserProfileModal, etc.
 │   │   ├── context/          # AuthContext, PusherContext
@@ -68,16 +66,16 @@ ZYFR Web Application/
 │   ├── package.json
 │   ├── tailwind.config.js
 │   └── vite.config.js
-├── server/                   # Backend Node.js / Express Server
+├── server/                   # Backend Node.js / Express Server service
 │   ├── config/               # Database connection (MongoDB)
 │   ├── controllers/          # authController, friendController, messageController, callController, userController
 │   ├── middleware/           # authMiddleware (JWT verification)
 │   ├── models/               # User, Friendship, Conversation, Message
 │   ├── routes/               # authRoutes, friendRoutes, messageRoutes, callRoutes, userRoutes
 │   ├── utils/                # pusher.js (Pusher server client)
-│   ├── server.js             # Express app & local dev server listener
+│   ├── index.js              # Server entrypoint (Express app & Vercel Services handler)
 │   └── package.json
-├── vercel.json               # Vercel SPA rewrites & serverless API routing
+├── vercel.json               # Vercel Services monorepo routing & configuration
 ├── README.md                 # GitHub Repository documentation
 └── PROJECT_EXPLANATION.txt   # Complete architectural breakdown
 ```

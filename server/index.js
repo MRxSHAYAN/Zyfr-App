@@ -1,6 +1,4 @@
-// ⚠️ MUST be first — loads .env before any module reads process.env
 import 'dotenv/config';
-
 import express from 'express';
 import cookieParser from 'cookie-parser';
 import cors from 'cors';
@@ -34,27 +32,39 @@ app.get('/api/health', (req, res) => {
   res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
-// API Routes Mounting
+// Database connection middleware for Vercel Serverless Function invocations
+let isConnected = false;
+app.use(async (req, res, next) => {
+  if (!isConnected) {
+    try {
+      await connectDB();
+      isConnected = true;
+    } catch (err) {
+      console.error('[Vercel DB Connection Error]:', err);
+    }
+  }
+  next();
+});
+
+// API Routes Mounting (including Vercel Services route aliases)
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/messages', messageRoutes);
+app.use('/api/chat', messageRoutes);
 app.use('/api/friends', friendRoutes);
 app.use('/api/calls', callRoutes);
+app.use('/api/video', callRoutes);
 
-// Connect to MongoDB FIRST, then start HTTP server
-const startServer = async () => {
-  await connectDB();
-  app.listen(PORT, () => {
-    console.log(`=================================================`);
-    console.log(` Server running on port ${PORT}`);
-    console.log(` Allowed Client URL: ${CLIENT_URL}`);
-    console.log(`=================================================`);
+// Start local HTTP dev server if executed directly (outside Vercel)
+if (!process.env.VERCEL && process.env.NODE_ENV !== 'production') {
+  connectDB().then(() => {
+    app.listen(PORT, () => {
+      console.log(`=================================================`);
+      console.log(` Server running on port ${PORT}`);
+      console.log(` Allowed Client URL: ${CLIENT_URL}`);
+      console.log(`=================================================`);
+    });
   });
-};
-
-// Start local dev server if executed directly
-if (process.env.NODE_ENV !== 'production' || !process.env.VERCEL) {
-  startServer();
 }
 
 export default app;
