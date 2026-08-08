@@ -3,10 +3,14 @@ import mongoose from 'mongoose';
 /**
  * Message Schema
  * Tracks individual chat messages sent between users.
- * References sender, receiver, and parent conversation.
+ * References conversationId, sender, receiver, message type, and optional callUrl.
  */
 const messageSchema = new mongoose.Schema(
   {
+    conversationId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Conversation',
+    },
     senderId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
@@ -21,6 +25,15 @@ const messageSchema = new mongoose.Schema(
       type: String,
       required: true,
       trim: true,
+    },
+    type: {
+      type: String,
+      enum: ['text', 'call_invite'],
+      default: 'text',
+    },
+    callUrl: {
+      type: String,
+      default: '',
     },
     isRead: {
       type: Boolean,

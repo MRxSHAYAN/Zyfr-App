@@ -1,172 +1,140 @@
-import React, { useState, useEffect } from 'react';
-import { MessageSquare, Lock, ShieldCheck, Laptop } from 'lucide-react';
-import api from '../services/api';
-import { useAuth } from '../context/AuthContext';
-import { useSocket } from '../context/SocketContext';
+import React, { useState } from 'react';
+import { Video, PhoneCall, X, PhoneOff, ShieldAlert } from 'lucide-react';
 import Sidebar from '../components/Sidebar';
 import ChatWindow from '../components/ChatWindow';
+import UserProfileModal from '../components/UserProfileModal';
+import DailyVideoCall from '../components/DailyVideoCall';
+import { useAuth } from '../context/AuthContext';
+import { usePusher } from '../context/PusherContext';
+import api from '../services/api';
 
 const ChatPage = () => {
-  const [users, setUsers] = useState([]);
-  const [selectedUser, setSelectedUser] = useState(null);
-  const [messages, setMessages] = useState([]);
-  const [loadingUsers, setLoadingUsers] = useState(true);
-  const [isTyping, setIsTyping] = useState(false);
-
   const { authUser } = useAuth();
-  const { socket } = useSocket();
+  const { incomingCall, setIncomingCall } = usePusher();
 
-  // 1. Fetch contact users on mount
-  const fetchUsers = async () => {
+  const [activeFriend, setActiveFriend] = useState(null);
+  const [profileModalUser, setProfileModalUser] = useState(null);
+  const [isOwnProfile, setIsOwnProfile] = useState(false);
+  const [activeCallRoomUrl, setActiveCallRoomUrl] = useState(null);
+  const [activeCallCaller, setActiveCallCaller] = useState(null);
+  const [errorMsg, setErrorMsg] = useState('');
+
+  // Start Video Call handler
+  const handleStartCall = async (friendId) => {
+    setErrorMsg('');
     try {
-      setLoadingUsers(true);
-      const res = await api.get('/users');
-      setUsers(res.data);
-    } catch (error) {
-      console.error('[ChatPage] Error fetching user contacts:', error);
-    } finally {
-      setLoadingUsers(false);
+      const res = await api.post('/calls/create-room', { recipientId: friendId });
+      if (res.data && res.data.roomUrl) {
+        setActiveCallRoomUrl(res.data.roomUrl);
+        setActiveCallCaller(null);
+      }
+    } catch (err) {
+      setErrorMsg(err.response?.data?.message || 'Failed to start video call.');
+      setTimeout(() => setErrorMsg(''), 4000);
     }
   };
 
-  useEffect(() => {
-    fetchUsers();
-  }, []);
-
-  // 2. Fetch conversation history when selecting a user
-  useEffect(() => {
-    if (!selectedUser) return;
-
-    const fetchMessages = async () => {
-      try {
-        const res = await api.get(`/messages/${selectedUser._id}`);
-        setMessages(res.data);
-        // Refresh users list to reset unread badge counter for this user
-        fetchUsers();
-      } catch (error) {
-        console.error('[ChatPage] Error fetching message history:', error);
-      }
-    };
-
-    fetchMessages();
-  }, [selectedUser]);
-
-  // 3. Socket event listeners for real-time messages & typing events
-  useEffect(() => {
-    if (!socket) return;
-
-    // Listen for incoming real-time messages
-    const handleNewMessage = (newMessage) => {
-      const isFromSelectedUser = selectedUser && newMessage.senderId === selectedUser._id;
-
-      if (isFromSelectedUser) {
-        setMessages((prev) => [...prev, newMessage]);
-      }
-
-      // Refresh contact list preview & unread counts
-      fetchUsers();
-    };
-
-    // Listen for typing events
-    const handleUserTyping = ({ senderId }) => {
-      if (selectedUser && senderId === selectedUser._id) {
-        setIsTyping(true);
-      }
-    };
-
-    // Listen for stop typing events
-    const handleUserStopTyping = ({ senderId }) => {
-      if (selectedUser && senderId === selectedUser._id) {
-        setIsTyping(false);
-      }
-    };
-
-    socket.on('newMessage', handleNewMessage);
-    socket.on('userTyping', handleUserTyping);
-    socket.on('userStopTyping', handleUserStopTyping);
-
-    return () => {
-      socket.off('newMessage', handleNewMessage);
-      socket.off('userTyping', handleUserTyping);
-      socket.off('userStopTyping', handleUserStopTyping);
-    };
-  }, [socket, selectedUser]);
-
-  // Handle message submission
-  const handleSendMessage = async (messageText) => {
-    if (!selectedUser) return;
-
-    try {
-      const res = await api.post(`/messages/send/${selectedUser._id}`, {
-        message: messageText,
-      });
-
-      // Append to local message stream
-      setMessages((prev) => [...prev, res.data]);
-
-      // Update sidebar user order & previews
-      fetchUsers();
-    } catch (error) {
-      console.error('[ChatPage] Error sending message:', error);
+  // Join Video Call handler
+  const handleJoinCall = (roomUrl, callerInfo = null) => {
+    setActiveCallRoomUrl(roomUrl);
+    setActiveCallCaller(callerInfo);
+    if (incomingCall && incomingCall.roomUrl === roomUrl) {
+      setIncomingCall(null);
     }
   };
 
   return (
-    <div className="h-screen w-screen overflow-hidden bg-[#090d16] flex items-center justify-center p-0 md:p-3">
-      {/* Outer WhatsApp Web Window Container */}
-      <div className="w-full h-full max-w-[1600px] bg-[#111b21] rounded-none md:rounded-2xl shadow-2xl overflow-hidden flex border border-[#222d34]">
-        {/* Sidebar Panel - visible on mobile if no user selected, always on desktop */}
-        <div
-          className={`${
-            selectedUser ? 'hidden md:flex' : 'flex'
-          } w-full md:w-auto h-full flex-shrink-0`}
-        >
-          <Sidebar
-            users={users}
-            selectedUser={selectedUser}
-            onSelectUser={(user) => {
-              setSelectedUser(user);
-              setIsTyping(false);
-            }}
-            loading={loadingUsers}
+    <div className="h-screen w-screen bg-slate-950 text-slate-100 flex overflow-hidden font-sans">
+      {/* Global Error Banner */}
+      {errorMsg && (
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 bg-rose-500 text-white font-medium text-xs px-5 py-2.5 rounded-2xl shadow-2xl flex items-center gap-2 animate-in fade-in slide-in-from-top-4">
+          <ShieldAlert className="w-4 h-4" />
+          <span>{errorMsg}</span>
+        </div>
+      )}
+
+      {/* Incoming Call Overlay Alert */}
+      {incomingCall && (
+        <div className="fixed top-6 right-6 z-50 bg-slate-900 border-2 border-emerald-500/50 p-4 rounded-3xl shadow-2xl flex items-center gap-4 animate-bounce max-w-sm">
+          <img
+            src={incomingCall.caller?.avatar}
+            alt="Caller"
+            className="w-12 h-12 rounded-2xl object-cover border border-slate-700 bg-slate-800"
           />
+          <div className="flex-1 min-w-0">
+            <h4 className="text-sm font-bold text-slate-100 truncate">
+              Incoming Video Call
+            </h4>
+            <p className="text-xs text-slate-400 truncate">
+              {incomingCall.caller?.fullName || incomingCall.caller?.username} is calling...
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => handleJoinCall(incomingCall.roomUrl, incomingCall.caller)}
+              className="p-3 bg-emerald-500 hover:bg-emerald-400 text-slate-950 rounded-2xl shadow-lg transition-all"
+              title="Answer Call"
+            >
+              <PhoneCall className="w-5 h-5" />
+            </button>
+            <button
+              onClick={() => setIncomingCall(null)}
+              className="p-3 bg-rose-500/20 hover:bg-rose-500/30 text-rose-400 rounded-2xl transition-all"
+              title="Decline"
+            >
+              <PhoneOff className="w-5 h-5" />
+            </button>
+          </div>
         </div>
+      )}
 
-        {/* Chat Window Panel */}
-        <div
-          className={`${
-            !selectedUser ? 'hidden md:flex' : 'flex'
-          } flex-1 h-full flex-col bg-[#0b141a]`}
-        >
-          {selectedUser ? (
-            <ChatWindow
-              selectedUser={selectedUser}
-              messages={messages}
-              onSendMessage={handleSendMessage}
-              isTyping={isTyping}
-              onBack={() => setSelectedUser(null)}
-            />
-          ) : (
-            /* WhatsApp Web Styled Empty State Placeholder */
-            <div className="flex-1 h-full bg-[#111b21] border-l border-[#222d34] flex flex-col items-center justify-center p-8 text-center chat-pattern-bg">
-              <div className="w-24 h-24 rounded-full bg-[#202c33] flex items-center justify-center mb-6 shadow-xl border border-[#222d34]">
-                <MessageSquare className="w-12 h-12 text-[#00a884]" />
-              </div>
+      {/* Sidebar Navigation */}
+      <Sidebar
+        activeFriend={activeFriend}
+        onSelectFriend={(friend) => setActiveFriend(friend)}
+        onViewProfile={(user) => {
+          setProfileModalUser(user);
+          setIsOwnProfile(false);
+        }}
+        onOpenOwnProfile={() => {
+          setProfileModalUser(authUser);
+          setIsOwnProfile(true);
+        }}
+      />
 
-              <h1 className="text-2xl font-light text-[#e9edef] mb-3">WhatsApp Web Clone</h1>
+      {/* Main Chat Box Window */}
+      <ChatWindow
+        friend={activeFriend}
+        onStartCall={handleStartCall}
+        onJoinCall={handleJoinCall}
+        onViewProfile={(user) => {
+          setProfileModalUser(user);
+          setIsOwnProfile(user._id === authUser._id);
+        }}
+      />
 
-              <p className="text-sm text-[#8696a0] max-w-md leading-relaxed mb-8">
-                Send and receive real-time messages without connecting your phone. Select a contact from the sidebar to start a secure conversation.
-              </p>
+      {/* User Profile Modal */}
+      {profileModalUser && (
+        <UserProfileModal
+          user={profileModalUser}
+          isOwnProfile={isOwnProfile}
+          onClose={() => setProfileModalUser(null)}
+          onActionSuccess={() => setProfileModalUser(null)}
+        />
+      )}
 
-              <div className="flex items-center space-x-2 text-xs text-[#8696a0] bg-[#182229] border border-[#222d34] px-4 py-2 rounded-full">
-                <Lock className="w-4 h-4 text-[#00a884]" />
-                <span>End-to-end encrypted real-time WebSocket protocol</span>
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
+      {/* Daily.co Embedded Video Call Modal */}
+      {activeCallRoomUrl && (
+        <DailyVideoCall
+          roomUrl={activeCallRoomUrl}
+          callerInfo={activeCallCaller}
+          onClose={() => {
+            setActiveCallRoomUrl(null);
+            setActiveCallCaller(null);
+          }}
+        />
+      )}
     </div>
   );
 };

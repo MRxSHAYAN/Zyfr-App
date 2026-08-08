@@ -1,87 +1,112 @@
 import React, { useState } from 'react';
-import { Search, LogOut, MessageSquarePlus, MoreVertical, X } from 'lucide-react';
+import { MessageSquare, Users, UserPlus, LogOut, User, Sparkles, Clock } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import { useSocket } from '../context/SocketContext';
-import UserItem from './UserItem';
+import FriendList from './FriendList';
+import UserSearch from './UserSearch';
+import PendingRequests from './PendingRequests';
 
-const Sidebar = ({ users, selectedUser, onSelectUser, loading }) => {
+const Sidebar = ({ activeFriend, onSelectFriend, onViewProfile, onOpenOwnProfile }) => {
   const { authUser, logout } = useAuth();
-  const { onlineUsers } = useSocket();
-  const [searchQuery, setSearchQuery] = useState('');
-
-  // Filter contacts by search query
-  const filteredUsers = users.filter((user) =>
-    user.username.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    user.email.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const [activeTab, setActiveTab] = useState('chats'); // 'chats' | 'search' | 'requests'
 
   return (
-    <aside className="w-full md:w-[380px] lg:w-[420px] h-full bg-[#111b21] border-r border-[#222d34] flex flex-col flex-shrink-0">
-      {/* Header bar */}
-      <div className="h-16 px-4 bg-[#202c33] flex items-center justify-between border-b border-[#222d34]">
-        <div className="flex items-center space-x-3">
-          <img
-            src={authUser?.avatar}
-            alt={authUser?.username}
-            className="w-10 h-10 rounded-full object-cover border border-[#00a884]"
-          />
-          <div>
-            <h3 className="text-sm font-semibold text-[#e9edef]">{authUser?.username}</h3>
-            <span className="text-[11px] text-[#00a884] font-medium">Online</span>
-          </div>
-        </div>
-
-        <div className="flex items-center space-x-2 text-[#8696a0]">
-          <button
-            onClick={logout}
-            title="Log out"
-            className="p-2 hover:bg-[#2a3942] hover:text-red-400 rounded-full transition-colors"
-          >
-            <LogOut className="w-5 h-5" />
-          </button>
-        </div>
-      </div>
-
-      {/* Search Input Bar */}
-      <div className="p-2 bg-[#111b21]">
-        <div className="relative flex items-center bg-[#202c33] rounded-lg px-3 py-1.5 focus-within:ring-1 focus-within:ring-[#00a884]">
-          <Search className="w-4 h-4 text-[#8696a0] mr-2 flex-shrink-0" />
-          <input
-            type="text"
-            placeholder="Search or start new chat"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full bg-transparent text-sm text-[#e9edef] placeholder-[#8696a0] outline-none"
-          />
-          {searchQuery && (
-            <button onClick={() => setSearchQuery('')} className="text-[#8696a0] hover:text-white">
-              <X className="w-4 h-4" />
-            </button>
-          )}
-        </div>
-      </div>
-
-      {/* Contacts List */}
-      <div className="flex-1 overflow-y-auto divide-y divide-[#222d34]/40">
-        {loading ? (
-          <div className="p-8 text-center text-[#8696a0] text-sm">
-            <div className="inline-block animate-spin rounded-full h-6 w-6 border-2 border-[#00a884] border-t-transparent mb-2"></div>
-            <p>Loading contacts...</p>
-          </div>
-        ) : filteredUsers.length === 0 ? (
-          <div className="p-8 text-center text-[#8696a0] text-sm">
-            {searchQuery ? 'No contacts match your search.' : 'No active users found.'}
-          </div>
-        ) : (
-          filteredUsers.map((user) => (
-            <UserItem
-              key={user._id}
-              user={user}
-              isSelected={selectedUser?._id === user._id}
-              isOnline={onlineUsers.includes(user._id)}
-              onClick={() => onSelectUser(user)}
+    <aside className="w-full md:w-80 lg:w-96 bg-slate-900 border-r border-slate-800 flex flex-col h-full shrink-0">
+      {/* Header Profile Banner */}
+      <div className="p-4 bg-slate-950 border-b border-slate-800 flex items-center justify-between">
+        <div
+          onClick={onOpenOwnProfile}
+          className="flex items-center gap-3 cursor-pointer group flex-1 min-w-0"
+        >
+          <div className="relative">
+            <img
+              src={authUser?.avatar}
+              alt={authUser?.username}
+              className="w-10 h-10 rounded-xl object-cover border border-slate-800 group-hover:border-emerald-500 transition-all bg-slate-800"
             />
-          ))
+            <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-emerald-500 border-2 border-slate-950 rounded-full" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <h3 className="text-sm font-semibold text-slate-100 truncate group-hover:text-emerald-400 transition-all">
+              {authUser?.fullName || authUser?.username}
+            </h3>
+            <p className="text-xs text-slate-400 truncate">@{authUser?.username}</p>
+          </div>
+        </div>
+
+        <button
+          onClick={logout}
+          className="p-2 text-slate-400 hover:text-rose-400 hover:bg-slate-800/80 rounded-xl transition-all"
+          title="Sign Out"
+        >
+          <LogOut className="w-4 h-4" />
+        </button>
+      </div>
+
+      {/* Sidebar Navigation Tabs */}
+      <div className="p-2 bg-slate-950/40 border-b border-slate-800 flex items-center gap-1">
+        <button
+          onClick={() => setActiveTab('chats')}
+          className={`flex-1 py-2 px-3 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition-all ${
+            activeTab === 'chats'
+              ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 shadow-sm'
+              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+          }`}
+        >
+          <MessageSquare className="w-3.5 h-3.5" />
+          Friends
+        </button>
+
+        <button
+          onClick={() => setActiveTab('search')}
+          className={`flex-1 py-2 px-3 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition-all ${
+            activeTab === 'search'
+              ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 shadow-sm'
+              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+          }`}
+        >
+          <UserPlus className="w-3.5 h-3.5" />
+          Search
+        </button>
+
+        <button
+          onClick={() => setActiveTab('requests')}
+          className={`flex-1 py-2 px-3 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition-all ${
+            activeTab === 'requests'
+              ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 shadow-sm'
+              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+          }`}
+        >
+          <Clock className="w-3.5 h-3.5" />
+          Requests
+        </button>
+      </div>
+
+      {/* Tab Content Area */}
+      <div className="flex-1 overflow-hidden flex flex-col">
+        {activeTab === 'chats' && (
+          <FriendList
+            activeFriend={activeFriend}
+            onSelectFriend={onSelectFriend}
+            onViewProfile={onViewProfile}
+          />
+        )}
+
+        {activeTab === 'search' && (
+          <UserSearch
+            onSelectFriend={(friend) => {
+              onSelectFriend(friend);
+              setActiveTab('chats');
+            }}
+            onViewProfile={onViewProfile}
+          />
+        )}
+
+        {activeTab === 'requests' && (
+          <PendingRequests
+            onRequestHandled={() => {
+              // Option to update UI if needed
+            }}
+          />
         )}
       </div>
     </aside>

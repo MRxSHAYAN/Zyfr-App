@@ -1,17 +1,18 @@
+// ⚠️ MUST be first — loads .env before any module reads process.env
+import 'dotenv/config';
+
 import express from 'express';
-import dotenv from 'dotenv';
 import cookieParser from 'cookie-parser';
 import cors from 'cors';
 import { connectDB } from './config/db.js';
-import { app, server } from './socket/socket.js';
 
 import authRoutes from './routes/authRoutes.js';
 import userRoutes from './routes/userRoutes.js';
 import messageRoutes from './routes/messageRoutes.js';
+import friendRoutes from './routes/friendRoutes.js';
+import callRoutes from './routes/callRoutes.js';
 
-// Load environment variables from .env file
-dotenv.config();
-
+const app = express();
 const PORT = process.env.PORT || 5000;
 const CLIENT_URL = process.env.CLIENT_URL || 'http://localhost:5173';
 
@@ -23,7 +24,7 @@ app.use(cookieParser());
 // Configure CORS for cross-origin request credentials (HTTP-Only cookies)
 app.use(
   cors({
-    origin: [CLIENT_URL, 'http://127.0.0.1:5173'],
+    origin: [CLIENT_URL, 'http://127.0.0.1:5173', 'https://zyfr.vercel.app'],
     credentials: true,
   })
 );
@@ -37,12 +38,23 @@ app.get('/api/health', (req, res) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/messages', messageRoutes);
+app.use('/api/friends', friendRoutes);
+app.use('/api/calls', callRoutes);
 
-// Connect to MongoDB and start HTTP/Socket server
-server.listen(PORT, async () => {
+// Connect to MongoDB FIRST, then start HTTP server
+const startServer = async () => {
   await connectDB();
-  console.log(`=================================================`);
-  console.log(`🚀 Server running on port ${PORT}`);
-  console.log(`🌐 Allowed Client URL: ${CLIENT_URL}`);
-  console.log(`=================================================`);
-});
+  app.listen(PORT, () => {
+    console.log(`=================================================`);
+    console.log(` Server running on port ${PORT}`);
+    console.log(` Allowed Client URL: ${CLIENT_URL}`);
+    console.log(`=================================================`);
+  });
+};
+
+// Start local dev server if executed directly
+if (process.env.NODE_ENV !== 'production' || !process.env.VERCEL) {
+  startServer();
+}
+
+export default app;

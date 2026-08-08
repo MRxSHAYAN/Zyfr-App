@@ -15,14 +15,14 @@ export const AuthProvider = ({ children }) => {
   const [authUser, setAuthUser] = useState(null);
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
 
-  // Verify active session via HTTP-Only cookie on component mount
   useEffect(() => {
     const checkAuthStatus = async () => {
       try {
         const res = await api.get('/auth/check');
         setAuthUser(res.data);
       } catch (error) {
-        console.log('[AuthContext] No active session found or cookie expired');
+        console.log('[AuthContext] No active session found');
+        localStorage.removeItem('zyfr_token');
         setAuthUser(null);
       } finally {
         setIsCheckingAuth(false);
@@ -32,10 +32,12 @@ export const AuthProvider = ({ children }) => {
     checkAuthStatus();
   }, []);
 
-  // Login handler
   const login = async (identifier, password) => {
     try {
       const res = await api.post('/auth/login', { identifier, password });
+      if (res.data.token) {
+        localStorage.setItem('zyfr_token', res.data.token);
+      }
       setAuthUser(res.data);
       return { success: true };
     } catch (error) {
@@ -46,10 +48,12 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  // Registration handler
-  const register = async (username, email, password, avatar) => {
+  const register = async (username, fullName, email, password, avatar, bio) => {
     try {
-      const res = await api.post('/auth/register', { username, email, password, avatar });
+      const res = await api.post('/auth/register', { username, fullName, email, password, avatar, bio });
+      if (res.data.token) {
+        localStorage.setItem('zyfr_token', res.data.token);
+      }
       setAuthUser(res.data);
       return { success: true };
     } catch (error) {
@@ -60,13 +64,26 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  // Logout handler
+  const updateProfile = async (profileData) => {
+    try {
+      const res = await api.put('/users/profile', profileData);
+      setAuthUser(res.data);
+      return { success: true, user: res.data };
+    } catch (error) {
+      return {
+        success: false,
+        message: error.response?.data?.message || 'Failed to update profile.',
+      };
+    }
+  };
+
   const logout = async () => {
     try {
       await api.post('/auth/logout');
     } catch (error) {
       console.error('[AuthContext] Logout API error:', error);
     } finally {
+      localStorage.removeItem('zyfr_token');
       setAuthUser(null);
     }
   };
@@ -79,6 +96,7 @@ export const AuthProvider = ({ children }) => {
         isCheckingAuth,
         login,
         register,
+        updateProfile,
         logout,
       }}
     >

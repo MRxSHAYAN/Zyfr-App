@@ -1,10 +1,11 @@
 import express from 'express';
-import { getUsersForSidebar } from '../controllers/userController.js';
+import { searchUsers, updateProfile, getUserProfile } from '../controllers/userController.js';
 import { protectRoute } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
 
-// User contacts endpoint for sidebar
-router.get('/', protectRoute, getUsersForSidebar);
+router.get('/search', protectRoute, searchUsers);
+router.put('/profile', protectRoute, updateProfile);
+router.get('/:id', protectRoute, getUserProfile);
 
 export default router;

@@ -14,6 +14,11 @@ const userSchema = new mongoose.Schema(
       trim: true,
       minlength: [3, 'Username must be at least 3 characters long'],
     },
+    fullName: {
+      type: String,
+      trim: true,
+      default: '',
+    },
     email: {
       type: String,
       required: [true, 'Email is required'],
@@ -31,16 +36,32 @@ const userSchema = new mongoose.Schema(
       type: String,
       default: '',
     },
+    bio: {
+      type: String,
+      default: 'Hey there! I am using ZYFR.',
+      trim: true,
+    },
+    isOnline: {
+      type: Boolean,
+      default: false,
+    },
+    lastSeen: {
+      type: Date,
+      default: Date.now,
+    },
   },
   {
     timestamps: true, // Auto-generates createdAt and updatedAt fields
   }
 );
 
-// Fallback to dynamic avatar generation before saving if missing
+// Fallback to dynamic avatar and default fullName generation before saving if missing
 userSchema.pre('save', function (next) {
+  if (!this.fullName) {
+    this.fullName = this.username;
+  }
   if (!this.avatar) {
-    this.avatar = `https://ui-avatars.com/api/?name=${encodeURIComponent(this.username)}&background=00a884&color=fff&bold=true`;
+    this.avatar = `https://ui-avatars.com/api/?name=${encodeURIComponent(this.fullName || this.username)}&background=00a884&color=fff&bold=true`;
   }
   next();
 });

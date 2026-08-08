@@ -1,53 +1,73 @@
 import Conversation from '../models/Conversation.js';
 import Message from '../models/Message.js';
-import { getReceiverSocketId, io } from '../socket/socket.js';
+import Friendship from '../models/Friendship.js';
+import { triggerPusher } from '../utils/pusher.js';
 
 /**
- * @desc    Get all messages between authenticated user and specified contact
+ * Helper to verify that two users are confirmed friends (status: 'accepted')
+ */
+const verifyFriends = async (userId1, userId2) => {
+  const friendship = await Friendship.findOne({
+    $or: [
+      { requester: userId1, recipient: userId2, status: 'accepted' },
+      { requester: userId2, recipient: userId1, status: 'accepted' },
+    ],
+  });
+  return !!friendship;
+};
+
+/**
+ * @desc    Get chat history between current user and a confirmed friend
  * @route   GET /api/messages/:id
- * @access  Private
+ * @access  Private (Friends-Only)
  */
 export const getMessages = async (req, res) => {
   try {
-    const { id: userToChatId } = req.params;
-    const senderId = req.user._id;
+    const { id: friendId } = req.params;
+    const currentUserId = req.user._id;
 
-    // Find conversation between sender and receiver
+    // STRICT ACCESS CONTROL RULE 1: Check if users are confirmed friends
+    const isFriend = await verifyFriends(currentUserId, friendId);
+    if (!isFriend) {
+      return res.status(403).json({
+        message: 'Forbidden: You can only view chat history with confirmed friends.',
+        isLocked: true,
+      });
+    }
+
     const conversation = await Conversation.findOne({
-      participants: { $all: [senderId, userToChatId] },
+      participants: { $all: [currentUserId, friendId] },
     }).populate('messages');
 
     if (!conversation) {
       return res.status(200).json([]);
     }
 
-    // Mark messages sent to req.user as read
+    // Mark incoming messages as read
     await Message.updateMany(
       {
-        senderId: userToChatId,
-        receiverId: senderId,
+        conversationId: conversation._id,
+        receiverId: currentUserId,
         isRead: false,
       },
       { $set: { isRead: true } }
     );
 
-    const messages = conversation.messages;
-
-    return res.status(200).json(messages);
+    return res.status(200).json(conversation.messages || []);
   } catch (error) {
-    console.error(`[getMessages Controller Error]: ${error.message}`);
+    console.error('[getMessages Error]:', error.message);
     return res.status(500).json({ message: 'Error retrieving chat history' });
   }
 };
 
 /**
- * @desc    Send a new message to a user
+ * @desc    Send a message to a confirmed friend
  * @route   POST /api/messages/send/:id
- * @access  Private
+ * @access  Private (Friends-Only)
  */
 export const sendMessage = async (req, res) => {
   try {
-    const { message } = req.body;
+    const { message, type = 'text', callUrl = '' } = req.body;
     const { id: receiverId } = req.params;
     const senderId = req.user._id;
 
@@ -55,42 +75,89 @@ export const sendMessage = async (req, res) => {
       return res.status(400).json({ message: 'Message content cannot be empty' });
     }
 
-    // 1. Find existing conversation or create a new one
+    // STRICT ACCESS CONTROL RULE 1: Enforce confirmed friends check
+    const isFriend = await verifyFriends(senderId, receiverId);
+    if (!isFriend) {
+      return res.status(403).json({
+        message: 'Forbidden: You can only send direct messages to confirmed friends.',
+        isLocked: true,
+      });
+    }
+
     let conversation = await Conversation.findOne({
       participants: { $all: [senderId, receiverId] },
     });
 
     if (!conversation) {
-      conversation = await Conversation.create({
+      conversation = new Conversation({
         participants: [senderId, receiverId],
+        messages: [],
       });
+      await conversation.save();
     }
 
-    // 2. Create message document
     const newMessage = new Message({
+      conversationId: conversation._id,
       senderId,
       receiverId,
       message: message.trim(),
+      type,
+      callUrl,
     });
 
-    if (newMessage) {
-      conversation.messages.push(newMessage._id);
-    }
+    await newMessage.save();
+    conversation.messages.push(newMessage._id);
+    await conversation.save();
 
-    // Run DB operations concurrently for performance
-    await Promise.all([conversation.save(), newMessage.save()]);
+    // Trigger Real-Time Pusher Broadcasts
+    // 1. Chat room channel event for active open chat
+    await triggerPusher(`chat-${conversation._id}`, 'message:new', newMessage);
 
-    // 3. Socket.io Real-Time Dispatch
-    const receiverSocketId = getReceiverSocketId(receiverId);
-
-    if (receiverSocketId) {
-      // Direct 1-on-1 socket emit to receiver
-      io.to(receiverSocketId).emit('newMessage', newMessage);
-    }
+    // 2. Receiver user channel event for unread notification/sidebar update
+    await triggerPusher(`user-${receiverId}`, 'message:received', {
+      message: newMessage,
+      sender: {
+        _id: req.user._id,
+        username: req.user.username,
+        fullName: req.user.fullName || req.user.username,
+        avatar: req.user.avatar,
+      },
+    });
 
     return res.status(201).json(newMessage);
   } catch (error) {
-    console.error(`[sendMessage Controller Error]: ${error.message}`);
+    console.error('[sendMessage Error]:', error.message);
     return res.status(500).json({ message: 'Error sending message' });
+  }
+};
+
+/**
+ * @desc    Trigger typing indicator via Pusher
+ * @route   POST /api/messages/typing
+ * @access  Private
+ */
+export const sendTypingIndicator = async (req, res) => {
+  try {
+    const { friendId, isTyping } = req.body;
+    const currentUserId = req.user._id;
+
+    const isFriend = await verifyFriends(currentUserId, friendId);
+    if (!isFriend) return res.status(403).json({ message: 'Forbidden' });
+
+    const conversation = await Conversation.findOne({
+      participants: { $all: [currentUserId, friendId] },
+    });
+
+    if (conversation) {
+      await triggerPusher(`chat-${conversation._id}`, 'typing', {
+        userId: currentUserId,
+        isTyping,
+      });
+    }
+
+    return res.status(200).json({ success: true });
+  } catch (error) {
+    console.error('[sendTypingIndicator Error]:', error.message);
+    return res.status(500).json({ message: 'Error sending typing status' });
   }
 };

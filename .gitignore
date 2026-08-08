@@ -10,3 +10,6 @@ Thumbs.db
 # Optional local env files
 .env
 .env.local
+
+# explanation files
+PROJECT_EXPLANATION.txt

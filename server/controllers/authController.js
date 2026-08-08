@@ -4,7 +4,7 @@ import User from '../models/User.js';
 
 /**
  * Helper Utility to generate JWT and attach HTTP-Only cookie to response.
- * Configured with dynamic sameSite & secure policies depending on environment.
+ * Also returns token string so clients can send Bearer token in headers if cookies are blocked.
  */
 const generateTokenAndSetCookie = (userId, res) => {
   const token = jwt.sign(
@@ -15,9 +15,9 @@ const generateTokenAndSetCookie = (userId, res) => {
 
   res.cookie('jwt', token, {
     maxAge: 15 * 24 * 60 * 60 * 1000, // 15 Days
-    httpOnly: true, // Prevent client-side JS access (mitigates XSS)
-    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax', // 'none' for cross-domain HTTPS in prod, 'lax' for local dev
-    secure: process.env.NODE_ENV === 'production', // Requires HTTPS in production
+    httpOnly: true,
+    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+    secure: process.env.NODE_ENV === 'production',
   });
 
   return token;
@@ -30,9 +30,8 @@ const generateTokenAndSetCookie = (userId, res) => {
  */
 export const register = async (req, res) => {
   try {
-    const { username, email, password, avatar } = req.body;
+    const { username, fullName, email, password, avatar, bio } = req.body;
 
-    // Validation checks
     if (!username || !email || !password) {
       return res.status(400).json({ message: 'Please fill in all required fields' });
     }
@@ -41,7 +40,6 @@ export const register = async (req, res) => {
       return res.status(400).json({ message: 'Password must be at least 6 characters' });
     }
 
-    // Check existing user
     const existingUser = await User.findOne({
       $or: [{ email: email.toLowerCase() }, { username: username.trim() }],
     });
@@ -53,33 +51,38 @@ export const register = async (req, res) => {
       return res.status(400).json({ message: 'Username is already taken' });
     }
 
-    // Hash password with bcrypt
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
 
-    // Create avatar URL if custom URL not provided
+    const displayName = fullName && fullName.trim() !== '' ? fullName.trim() : username.trim();
     const avatarUrl =
       avatar ||
-      `https://ui-avatars.com/api/?name=${encodeURIComponent(username)}&background=00a884&color=fff&bold=true`;
+      `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&background=00a884&color=fff&bold=true`;
 
     const newUser = new User({
       username: username.trim(),
+      fullName: displayName,
       email: email.toLowerCase(),
       password: hashedPassword,
       avatar: avatarUrl,
+      bio: bio || 'Hey there! I am using ZYFR.',
+      isOnline: true,
     });
 
     await newUser.save();
 
-    // Attach JWT HTTP-Only Cookie
-    generateTokenAndSetCookie(newUser._id, res);
+    const token = generateTokenAndSetCookie(newUser._id, res);
 
     return res.status(201).json({
       _id: newUser._id,
       username: newUser.username,
+      fullName: newUser.fullName,
       email: newUser.email,
       avatar: newUser.avatar,
-      createdAt: newUser.createdAt,
+      bio: newUser.bio,
+      isOnline: newUser.isOnline,
+      lastSeen: newUser.lastSeen,
+      token,
     });
   } catch (error) {
     console.error(`[Register Controller Error]: ${error.message}`);
@@ -94,13 +97,12 @@ export const register = async (req, res) => {
  */
 export const login = async (req, res) => {
   try {
-    const { identifier, password } = req.body; // Can be email or username
+    const { identifier, password } = req.body;
 
     if (!identifier || !password) {
       return res.status(400).json({ message: 'Please enter your email/username and password' });
     }
 
-    // Search user by email or username
     const user = await User.findOne({
       $or: [{ email: identifier.toLowerCase() }, { username: identifier.trim() }],
     });
@@ -109,21 +111,27 @@ export const login = async (req, res) => {
       return res.status(400).json({ message: 'Invalid credentials' });
     }
 
-    // Verify password match
     const isPasswordCorrect = await bcrypt.compare(password, user.password);
     if (!isPasswordCorrect) {
       return res.status(400).json({ message: 'Invalid credentials' });
     }
 
-    // Issue HTTP-Only Cookie
-    generateTokenAndSetCookie(user._id, res);
+    user.isOnline = true;
+    user.lastSeen = new Date();
+    await user.save();
+
+    const token = generateTokenAndSetCookie(user._id, res);
 
     return res.status(200).json({
       _id: user._id,
       username: user.username,
+      fullName: user.fullName || user.username,
       email: user.email,
       avatar: user.avatar,
-      createdAt: user.createdAt,
+      bio: user.bio,
+      isOnline: user.isOnline,
+      lastSeen: user.lastSeen,
+      token,
     });
   } catch (error) {
     console.error(`[Login Controller Error]: ${error.message}`);
@@ -136,8 +144,11 @@ export const login = async (req, res) => {
  * @route   POST /api/auth/logout
  * @access  Public
  */
-export const logout = (req, res) => {
+export const logout = async (req, res) => {
   try {
+    if (req.user) {
+      await User.findByIdAndUpdate(req.user._id, { isOnline: false, lastSeen: new Date() });
+    }
     res.cookie('jwt', '', {
       maxAge: 0,
       httpOnly: true,
@@ -157,9 +168,10 @@ export const logout = (req, res) => {
  * @route   GET /api/auth/check
  * @access  Private (Protected by protectRoute)
  */
-export const checkAuth = (req, res) => {
+export const checkAuth = async (req, res) => {
   try {
-    return res.status(200).json(req.user);
+    const user = await User.findById(req.user._id).select('-password');
+    return res.status(200).json(user);
   } catch (error) {
     console.error(`[CheckAuth Controller Error]: ${error.message}`);
     return res.status(500).json({ message: 'Internal server error verifying session' });

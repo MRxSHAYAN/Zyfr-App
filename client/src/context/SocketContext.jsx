@@ -37,6 +37,7 @@ export const SocketProvider = ({ children }) => {
       if (socket) {
         socket.close();
         setSocket(null);
+        setOnlineUsers([]);
       }
     }
   }, [authUser]);
