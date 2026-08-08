@@ -10,7 +10,7 @@
 - **Backend**: Node.js / Express, Mongoose (MongoDB ODM), Pusher Server SDK (`pusher`), JWT Authentication, Cookie-Parser, CORS.
 - **Real-Time Messaging**: Pusher Channels.
 - **Video Calling**: Daily.co REST API & Embedded Video Frame.
-- **Deployment**: Vercel Serverless Functions (`api/index.js` + `vercel.json`).
+- **Deployment**: Vercel Serverless Functions (`server/api/index.js` + `vercel.json`).
 
 ---
 
