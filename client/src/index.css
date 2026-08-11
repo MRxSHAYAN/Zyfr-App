@@ -2,16 +2,141 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ─── Base Layer ─────────────────────────────────────────────── */
 @layer base {
+  *, *::before, *::after {
+    box-sizing: border-box;
+  }
+
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    scroll-behavior: smooth;
+  }
+
   body {
-    font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, Helvetica, Arial, sans-serif;
+    font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    @apply bg-white dark:bg-surface-950 text-surface-900 dark:text-surface-100;
+    transition: background-color 0.2s ease, color 0.2s ease;
+  }
+
+  /* Accessible focus ring */
+  :focus-visible {
+    @apply outline-none ring-2 ring-primary-500 ring-offset-2 ring-offset-white dark:ring-offset-surface-950;
   }
 }
 
-/* Custom Scrollbar styling for WhatsApp chat feed */
+/* ─── Component Layer ────────────────────────────────────────── */
+@layer components {
+
+  /* Card surface */
+  .card {
+    @apply bg-white dark:bg-surface-900
+           border border-surface-200 dark:border-surface-800
+           rounded-2xl shadow-glass dark:shadow-glass-dark;
+  }
+
+  /* Input field */
+  .input-field {
+    @apply w-full bg-surface-100 dark:bg-surface-950
+           border border-surface-200 dark:border-surface-800
+           rounded-xl px-4 py-2.5 text-sm
+           text-surface-900 dark:text-surface-100
+           placeholder:text-surface-400 dark:placeholder:text-surface-600
+           focus:outline-none focus:ring-2 focus:ring-primary-500/50 focus:border-primary-500
+           transition-all duration-150;
+  }
+
+  /* Primary button */
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-2
+           px-4 py-2.5 rounded-xl text-sm font-semibold
+           bg-primary-500 hover:bg-primary-600 active:bg-primary-700
+           text-white shadow-sm hover:shadow-glow-sm
+           transition-all duration-150
+           focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2
+           disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-primary-500;
+  }
+
+  /* Ghost/outline button */
+  .btn-ghost {
+    @apply inline-flex items-center justify-center gap-2
+           px-4 py-2.5 rounded-xl text-sm font-medium
+           bg-transparent hover:bg-surface-100 dark:hover:bg-surface-800
+           text-surface-600 dark:text-surface-400
+           border border-transparent hover:border-surface-200 dark:hover:border-surface-700
+           transition-all duration-150
+           disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  /* Danger button */
+  .btn-danger {
+    @apply inline-flex items-center justify-center gap-2
+           px-4 py-2.5 rounded-xl text-sm font-semibold
+           bg-red-500 hover:bg-red-600 active:bg-red-700
+           text-white shadow-sm transition-all duration-150
+           disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  /* Nav tab item */
+  .nav-tab {
+    @apply flex-1 py-2 px-3 rounded-xl text-xs font-semibold
+           flex items-center justify-center gap-1.5
+           transition-all duration-150;
+  }
+
+  .nav-tab-active {
+    @apply bg-primary-50 dark:bg-primary-500/10
+           text-primary-600 dark:text-primary-400
+           border border-primary-200 dark:border-primary-500/20;
+  }
+
+  .nav-tab-inactive {
+    @apply text-surface-500 dark:text-surface-400
+           hover:text-surface-800 dark:hover:text-surface-200
+           hover:bg-surface-100 dark:hover:bg-surface-800/50;
+  }
+
+  /* Online status dot */
+  .online-dot {
+    @apply absolute -bottom-0.5 -right-0.5
+           w-3.5 h-3.5 rounded-full
+           border-2 border-white dark:border-surface-900;
+  }
+}
+
+/* ─── Utility Layer ──────────────────────────────────────────── */
+@layer utilities {
+
+  /* Glassmorphism surface */
+  .glass {
+    @apply bg-white/80 dark:bg-surface-900/80 backdrop-blur-md
+           border border-white/20 dark:border-surface-700/30;
+  }
+
+  /* Chat message bubble patterns */
+  .chat-bg {
+    background-color: theme('colors.surface.50');
+    background-image: radial-gradient(rgba(0,0,0,0.04) 1px, transparent 0);
+    background-size: 24px 24px;
+  }
+
+  .dark .chat-bg {
+    background-color: theme('colors.surface.950');
+    background-image: radial-gradient(rgba(255,255,255,0.025) 1px, transparent 0);
+    background-size: 24px 24px;
+  }
+
+  /* Theme transition on all elements */
+  .theme-transition {
+    transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+  }
+}
+
+/* ─── Scrollbar ──────────────────────────────────────────────── */
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 5px;
+  height: 5px;
 }
 
 ::-webkit-scrollbar-track {
@@ -19,17 +144,10 @@
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(134, 150, 160, 0.2);
-  border-radius: 3px;
+  @apply bg-surface-300 dark:bg-surface-700;
+  border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(134, 150, 160, 0.4);
-}
-
-/* Chat background subtle pattern overlay */
-.chat-pattern-bg {
-  background-color: #0b141a;
-  background-image: radial-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 0);
-  background-size: 24px 24px;
+  @apply bg-surface-400 dark:bg-surface-600;
 }

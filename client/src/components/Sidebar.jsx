@@ -1,113 +1,136 @@
 import React, { useState } from 'react';
-import { MessageSquare, Users, UserPlus, LogOut, User, Sparkles, Clock } from 'lucide-react';
+import { MessageSquare, UserPlus, Clock, LogOut } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import FriendList from './FriendList';
 import UserSearch from './UserSearch';
 import PendingRequests from './PendingRequests';
+import ThemeToggle from './ThemeToggle';
+
+const TABS = [
+  { key: 'chats',    label: 'Friends',  Icon: MessageSquare },
+  { key: 'search',   label: 'Search',   Icon: UserPlus },
+  { key: 'requests', label: 'Requests', Icon: Clock },
+];
 
 const Sidebar = ({ activeFriend, onSelectFriend, onViewProfile, onOpenOwnProfile }) => {
   const { authUser, logout } = useAuth();
-  const [activeTab, setActiveTab] = useState('chats'); // 'chats' | 'search' | 'requests'
+  const [activeTab, setActiveTab] = useState('chats');
 
   return (
-    <aside className="w-full md:w-80 lg:w-96 bg-slate-900 border-r border-slate-800 flex flex-col h-full shrink-0">
-      {/* Header Profile Banner */}
-      <div className="p-4 bg-slate-950 border-b border-slate-800 flex items-center justify-between">
-        <div
+    <aside
+      aria-label="Sidebar navigation"
+      className="w-full md:w-80 lg:w-96 flex flex-col h-full shrink-0
+        bg-white dark:bg-surface-900
+        border-r border-surface-200 dark:border-surface-800
+        theme-transition"
+    >
+      {/* ── Profile header ──────────────────────── */}
+      <header className="p-4 bg-surface-50 dark:bg-surface-950 border-b border-surface-200 dark:border-surface-800 flex items-center justify-between gap-2">
+        <button
           onClick={onOpenOwnProfile}
-          className="flex items-center gap-3 cursor-pointer group flex-1 min-w-0"
+          className="flex items-center gap-3 cursor-pointer group flex-1 min-w-0 rounded-xl p-1 -ml-1
+            hover:bg-surface-100 dark:hover:bg-surface-800 transition-all
+            focus-visible:ring-2 focus-visible:ring-primary-500"
+          aria-label="Open your profile"
         >
-          <div className="relative">
+          <div className="relative shrink-0">
             <img
               src={authUser?.avatar}
               alt={authUser?.username}
-              className="w-10 h-10 rounded-xl object-cover border border-slate-800 group-hover:border-emerald-500 transition-all bg-slate-800"
+              className="w-10 h-10 rounded-xl object-cover border border-surface-200 dark:border-surface-700
+                group-hover:border-primary-400 transition-all bg-surface-200 dark:bg-surface-800"
             />
-            <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-emerald-500 border-2 border-slate-950 rounded-full" />
+            <span className="online-dot bg-emerald-500" />
           </div>
           <div className="min-w-0 flex-1">
-            <h3 className="text-sm font-semibold text-slate-100 truncate group-hover:text-emerald-400 transition-all">
+            <p className="text-sm font-semibold text-surface-900 dark:text-surface-100 truncate group-hover:text-primary-500 transition-colors">
               {authUser?.fullName || authUser?.username}
-            </h3>
-            <p className="text-xs text-slate-400 truncate">@{authUser?.username}</p>
+            </p>
+            <p className="text-xs text-surface-400 truncate">@{authUser?.username}</p>
           </div>
+        </button>
+
+        <div className="flex items-center gap-1 shrink-0">
+          <ThemeToggle />
+          <button
+            onClick={logout}
+            aria-label="Sign out"
+            className="p-2 text-surface-400 hover:text-rose-500 hover:bg-surface-100 dark:hover:bg-surface-800 rounded-xl transition-all focus-visible:ring-2 focus-visible:ring-primary-500"
+          >
+            <LogOut className="w-4 h-4" />
+          </button>
+        </div>
+      </header>
+
+      {/* ── Tab navigation ──────────────────────── */}
+      <nav
+        role="tablist"
+        aria-label="Sidebar sections"
+        className="p-2 bg-surface-50 dark:bg-surface-950/60 border-b border-surface-200 dark:border-surface-800 flex items-center gap-1"
+      >
+        {TABS.map(({ key, label, Icon }) => (
+          <button
+            key={key}
+            role="tab"
+            aria-selected={activeTab === key}
+            aria-controls={`tabpanel-${key}`}
+            id={`tab-${key}`}
+            onClick={() => setActiveTab(key)}
+            className={`nav-tab ${activeTab === key ? 'nav-tab-active' : 'nav-tab-inactive'}`}
+          >
+            <Icon className="w-3.5 h-3.5" />
+            {label}
+          </button>
+        ))}
+      </nav>
+
+      {/* ── Tab panels ──────────────────────────── */}
+      <div className="flex-1 overflow-hidden flex flex-col">
+        <div
+          id="tabpanel-chats"
+          role="tabpanel"
+          aria-labelledby="tab-chats"
+          hidden={activeTab !== 'chats'}
+          className="flex-1 overflow-hidden flex flex-col"
+        >
+          {activeTab === 'chats' && (
+            <FriendList
+              activeFriend={activeFriend}
+              onSelectFriend={onSelectFriend}
+              onViewProfile={onViewProfile}
+            />
+          )}
         </div>
 
-        <button
-          onClick={logout}
-          className="p-2 text-slate-400 hover:text-rose-400 hover:bg-slate-800/80 rounded-xl transition-all"
-          title="Sign Out"
+        <div
+          id="tabpanel-search"
+          role="tabpanel"
+          aria-labelledby="tab-search"
+          hidden={activeTab !== 'search'}
+          className="flex-1 overflow-hidden flex flex-col"
         >
-          <LogOut className="w-4 h-4" />
-        </button>
-      </div>
+          {activeTab === 'search' && (
+            <UserSearch
+              onSelectFriend={(friend) => {
+                onSelectFriend(friend);
+                setActiveTab('chats');
+              }}
+              onViewProfile={onViewProfile}
+            />
+          )}
+        </div>
 
-      {/* Sidebar Navigation Tabs */}
-      <div className="p-2 bg-slate-950/40 border-b border-slate-800 flex items-center gap-1">
-        <button
-          onClick={() => setActiveTab('chats')}
-          className={`flex-1 py-2 px-3 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition-all ${
-            activeTab === 'chats'
-              ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 shadow-sm'
-              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
-          }`}
+        <div
+          id="tabpanel-requests"
+          role="tabpanel"
+          aria-labelledby="tab-requests"
+          hidden={activeTab !== 'requests'}
+          className="flex-1 overflow-hidden flex flex-col"
         >
-          <MessageSquare className="w-3.5 h-3.5" />
-          Friends
-        </button>
-
-        <button
-          onClick={() => setActiveTab('search')}
-          className={`flex-1 py-2 px-3 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition-all ${
-            activeTab === 'search'
-              ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 shadow-sm'
-              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
-          }`}
-        >
-          <UserPlus className="w-3.5 h-3.5" />
-          Search
-        </button>
-
-        <button
-          onClick={() => setActiveTab('requests')}
-          className={`flex-1 py-2 px-3 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition-all ${
-            activeTab === 'requests'
-              ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 shadow-sm'
-              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
-          }`}
-        >
-          <Clock className="w-3.5 h-3.5" />
-          Requests
-        </button>
-      </div>
-
-      {/* Tab Content Area */}
-      <div className="flex-1 overflow-hidden flex flex-col">
-        {activeTab === 'chats' && (
-          <FriendList
-            activeFriend={activeFriend}
-            onSelectFriend={onSelectFriend}
-            onViewProfile={onViewProfile}
-          />
-        )}
-
-        {activeTab === 'search' && (
-          <UserSearch
-            onSelectFriend={(friend) => {
-              onSelectFriend(friend);
-              setActiveTab('chats');
-            }}
-            onViewProfile={onViewProfile}
-          />
-        )}
-
-        {activeTab === 'requests' && (
-          <PendingRequests
-            onRequestHandled={() => {
-              // Option to update UI if needed
-            }}
-          />
-        )}
+          {activeTab === 'requests' && (
+            <PendingRequests onRequestHandled={() => {}} />
+          )}
+        </div>
       </div>
     </aside>
   );
